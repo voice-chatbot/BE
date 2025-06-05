@@ -1,0 +1,9 @@
+livekit-server-sdk-python
+flask
+flask-cors
+python-dotenv
+elevenlabs
+numpy
+google-generativeai
+hypercorn
+pydub 

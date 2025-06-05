@@ -11,8 +11,9 @@ from io import BytesIO
 import requests
 import numpy as np
 import io
-# import google.generativeai as genai
+import google.generativeai as genai
 from collections import deque
+from pydub import AudioSegment
 
 load_dotenv()
 
@@ -32,10 +33,27 @@ elevenlabs = ElevenLabs(
 
 transcription_buffer = deque(maxlen=5)
 
+async def text_to_speech(text):
+    audio_generator = elevenlabs.text_to_speech.convert(
+        text=text,
+        voice_id="JBFqnCBsd6RMkjVDRZzb",
+        model_id="eleven_multilingual_v2",
+        output_format="mp3_44100_128",
+    )
+    # Convert generator to bytes
+    audio_bytes = b''.join(chunk for chunk in audio_generator)
+    print(f"Audio bytes length: {len(audio_bytes)}")
+    return audio_bytes
+    
 async def process_with_llm(text):
     print(f"Processing with LLM: {text}")
+    genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+    model = genai.GenerativeModel("gemini-2.0-flash-001")
+    response = model.generate_content(text)
+    print(f"LLM Response: {response.text}")
+    return response.text
 
-async def process_audio_stream(track: rtc.Track):
+async def process_audio_stream(track: rtc.Track, room: rtc.Room):
     # Initialize audio stream from LiveKit track
     audio_stream = rtc.AudioStream(track)
     buffer = []  # Buffer to store audio chunks
@@ -96,6 +114,54 @@ async def process_audio_stream(track: rtc.Track):
                             llm_response = await process_with_llm(text)
                             if llm_response:
                                 print(f"LLM Response: {llm_response}")
+                                
+                                # Convert LLM response to speech
+                                audio_response = await text_to_speech(llm_response)
+                                if audio_response:
+                                    print("Successfully generated speech response")
+                                    
+                                    # Convert MP3 to PCM format for LiveKit
+                                    audio_segment = AudioSegment.from_mp3(io.BytesIO(audio_response))
+                                    
+                                    # Convert to PCM format
+                                    pcm_data = audio_segment.raw_data
+                                    
+                                    # Create audio source with proper parameters
+                                    SAMPLE_RATE = 48000  # LiveKit standard
+                                    NUM_CHANNELS = 1  # Mono audio
+                                    SAMPLES_PER_CHANNEL = 480  # 10ms at 48kHz
+                                    
+                                    source = rtc.AudioSource(SAMPLE_RATE, NUM_CHANNELS)
+                                    audio_track = rtc.LocalAudioTrack.create_audio_track(
+                                        name="bot-response",
+                                        source=source
+                                    )
+                                    
+                                    # Publish the track to the room using the passed room instance
+                                    options = rtc.TrackPublishOptions(source=rtc.TrackSource.SOURCE_MICROPHONE)
+                                    await room.local_participant.publish_track(audio_track, options)
+                                    
+                                    # Convert audio data to numpy array
+                                    audio_data = np.frombuffer(pcm_data, dtype=np.int16)
+                                    
+                                    # Process audio in chunks
+                                    chunk_size = SAMPLES_PER_CHANNEL
+                                    for i in range(0, len(audio_data), chunk_size):
+                                        chunk = audio_data[i:i + chunk_size]
+                                        if len(chunk) < chunk_size:
+                                            # Pad the last chunk if needed
+                                            chunk = np.pad(chunk, (0, chunk_size - len(chunk)))
+                                        
+                                        # Create audio frame
+                                        frame = rtc.AudioFrame.create(SAMPLE_RATE, NUM_CHANNELS, chunk_size)
+                                        frame_data = np.frombuffer(frame.data, dtype=np.int16)
+                                        np.copyto(frame_data, chunk)
+                                        
+                                        # Send frame to the track
+                                        await source.capture_frame(frame)
+                                    
+                                    # Unpublish the track after sending
+                                    await room.local_participant.unpublish_track(audio_track)
                         
                         # Step 6: Clear the buffer after successful transcription
                         # This allows us to start collecting new audio
@@ -140,11 +206,10 @@ async def handle_audio_stream():
     def on_track_subscribed(track: rtc.Track, publication: rtc.TrackPublication, participant: rtc.RemoteParticipant):
         print(f"Publication: {publication}")
         if track.kind == rtc.TrackKind.KIND_AUDIO:
-            asyncio.create_task(process_audio_stream(track))
+            asyncio.create_task(process_audio_stream(track, room))
 
     try:
         await room.connect("wss://chat-e7jp6qc0.livekit.cloud", generate_backend_token())
-
         await asyncio.Event().wait()
     except Exception as e:
         print(f"Error in audio stream: {e}")
