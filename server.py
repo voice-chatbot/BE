@@ -22,7 +22,7 @@ CORS(app)  # Enable CORS for all routes
 
 # Initialize ElevenLabs client
 elevenlabs = ElevenLabs(
-    api_key="sk_53fe88903983940a8899c41d896eeaaf9fec626b941fcdd1",  # Replace this with your actual API key
+    api_key="sk_4f8c6b0640657c63ab05d48dfe00ef1751e51260c12f404c",  # Replace this with your actual API key
 )
 # audio_url = (
 #     "https://storage.googleapis.com/eleven-public-cdn/audio/marketing/nicole.mp3"
@@ -59,11 +59,16 @@ async def process_audio_stream(track: rtc.Track, room: rtc.Room):
     buffer = []  # Buffer to store audio chunks
     MIN_AUDIO_LENGTH = 3.0  # Minimum audio length in seconds
     SAMPLE_RATE = 48000  # LiveKit audio sample rate
+    is_processing = False  # Flag to control processing state
     
     try:
         # Step 1: LiveKit sends audio frames continuously
         async for event in audio_stream:
             try:
+                # Skip processing if we're already processing a response
+                if is_processing:
+                    continue
+                    
                 # Get raw audio frame from LiveKit
                 audio_frame = event.frame
                 
@@ -78,21 +83,22 @@ async def process_audio_stream(track: rtc.Track, room: rtc.Room):
                 
                 # Step 3: Process when we have enough audio (3 seconds)
                 if audio_length >= MIN_AUDIO_LENGTH:
-                    # Combine all audio chunks into one array
-                    combined_audio = np.concatenate(buffer)
-                    
-                    # Step 4: Create WAV file in memory with proper format
-                    wav_buffer = io.BytesIO()
-                    with wave.open(wav_buffer, 'wb') as wav_file:
-                        wav_file.setnchannels(1)  # Mono audio (1 channel)
-                        wav_file.setsampwidth(2)  # 16-bit audio (2 bytes per sample)
-                        wav_file.setframerate(SAMPLE_RATE)  # 48kHz sample rate
-                        wav_file.writeframes(combined_audio.tobytes())
-                    
-                    # Reset buffer position to start
-                    wav_buffer.seek(0)
-                    
+                    is_processing = True  # Set processing flag
                     try:
+                        # Combine all audio chunks into one array
+                        combined_audio = np.concatenate(buffer)
+                        
+                        # Step 4: Create WAV file in memory with proper format
+                        wav_buffer = io.BytesIO()
+                        with wave.open(wav_buffer, 'wb') as wav_file:
+                            wav_file.setnchannels(1)  # Mono audio (1 channel)
+                            wav_file.setsampwidth(2)  # 16-bit audio (2 bytes per sample)
+                            wav_file.setframerate(SAMPLE_RATE)  # 48kHz sample rate
+                            wav_file.writeframes(combined_audio.tobytes())
+                        
+                        # Reset buffer position to start
+                        wav_buffer.seek(0)
+                        
                         # Step 5: Send to ElevenLabs for transcription
                         transcription = elevenlabs.speech_to_text.convert(
                             file=wav_buffer,
@@ -162,15 +168,15 @@ async def process_audio_stream(track: rtc.Track, room: rtc.Room):
                                     
                                     # Unpublish the track after sending
                                     await room.local_participant.unpublish_track(audio_track)
-                        
-                        # Step 6: Clear the buffer after successful transcription
-                        # This allows us to start collecting new audio
+                    finally:
+                        # Reset processing flag and buffer after completion
+                        is_processing = False
                         buffer = []
-                    except Exception as e:
-                        print(f"Error in ElevenLabs API call: {str(e)}")
-                        # Keep the buffer in case of error
+                        
             except Exception as e:
                 print(f"Error processing audio frame: {str(e)}")
+                is_processing = False  # Reset processing flag on error
+                buffer = []  # Clear buffer on error
     finally:
         await audio_stream.aclose()
 
