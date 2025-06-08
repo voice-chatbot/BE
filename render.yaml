@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: your-app-name
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: GOOGLE_API_KEY
+        sync: false 

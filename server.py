@@ -14,6 +14,7 @@ import io
 import google.generativeai as genai
 from collections import deque
 from pydub import AudioSegment
+import json
 
 load_dotenv()
 
@@ -22,14 +23,8 @@ CORS(app)  # Enable CORS for all routes
 
 # Initialize ElevenLabs client
 elevenlabs = ElevenLabs(
-    api_key="sk_4f8c6b0640657c63ab05d48dfe00ef1751e51260c12f404c",  # Replace this with your actual API key
+    api_key=os.getenv('ELEVENLABS_API_KEY'),
 )
-# audio_url = (
-#     "https://storage.googleapis.com/eleven-public-cdn/audio/marketing/nicole.mp3"
-# )
-# response = requests.get(audio_url)
-# audio_data = BytesIO(response.content)
-
 
 transcription_buffer = deque(maxlen=5)
 
@@ -168,6 +163,9 @@ async def process_audio_stream(track: rtc.Track, room: rtc.Room):
                                     
                                     # Unpublish the track after sending
                                     await room.local_participant.unpublish_track(audio_track)
+                    except Exception as e:
+                        error_message = f"Error processing audio: {str(e)}"
+                        print(f"Error processing audio: {error_message}")
                     finally:
                         # Reset processing flag and buffer after completion
                         is_processing = False
