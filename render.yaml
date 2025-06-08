@@ -1,10 +1,12 @@
 services:
   - type: web
-    name: your-app-name
-    env: node
-    buildCommand: npm install
-    startCommand: npm start
+    name: chatbot-backend
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: hypercorn server:app --bind 0.0.0.0:$PORT
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.9.0
       - key: LIVEKIT_API_KEY
         sync: false
       - key: LIVEKIT_API_SECRET
@@ -12,4 +14,6 @@ services:
       - key: ELEVENLABS_API_KEY
         sync: false
       - key: GOOGLE_API_KEY
+        sync: false
+      - key: FRONTEND_URL
         sync: false 

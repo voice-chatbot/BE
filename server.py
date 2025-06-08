@@ -19,7 +19,14 @@ import json
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+# Configure CORS with specific origin
+CORS(app, resources={
+    r"/*": {
+        "origins": os.getenv('FRONTEND_URL', '*'),
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
 
 # Initialize ElevenLabs client
 elevenlabs = ElevenLabs(
@@ -192,16 +199,31 @@ def generate_backend_token():
 
 @app.route('/getToken')
 def getToken():
-    token = api.AccessToken(os.getenv('LIVEKIT_API_KEY'), os.getenv('LIVEKIT_API_SECRET')) \
-        .with_identity("user") \
-        .with_name("user-bot") \
-        .with_grants(api.VideoGrants(
-            room_join=True,
-            room="my-room",
-            can_subscribe=True,
-            can_publish=True,
-        ))
-    return {"token": token.to_jwt()}
+    try:
+        token = api.AccessToken(os.getenv('LIVEKIT_API_KEY'), os.getenv('LIVEKIT_API_SECRET')) \
+            .with_identity("user") \
+            .with_name("user-bot") \
+            .with_grants(api.VideoGrants(
+                room_join=True,
+                room="my-room",
+                can_subscribe=True,
+                can_publish=True,
+            ))
+        return {"token": token.to_jwt()}
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+@app.route('/health')
+def health_check():
+    return {"status": "healthy"}, 200
+
+@app.errorhandler(404)
+def not_found(error):
+    return {"error": "Resource not found"}, 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    return {"error": "Internal server error"}, 500
 
 async def handle_audio_stream():
     room = rtc.Room()
