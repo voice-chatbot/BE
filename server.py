@@ -6,7 +6,7 @@ import asyncio
 from flask import Flask
 from flask_cors import CORS
 from dotenv import load_dotenv
-from elevenlabs.client import ElevenLabs
+from elevenlabs import generate, play, set_api_key
 from io import BytesIO
 import requests
 import numpy as np
@@ -29,23 +29,17 @@ CORS(app, resources={
 })
 
 # Initialize ElevenLabs client
-elevenlabs = ElevenLabs(
-    api_key=os.getenv('ELEVENLABS_API_KEY'),
-)
+set_api_key(os.getenv('ELEVENLABS_API_KEY'))
 
 transcription_buffer = deque(maxlen=5)
 
 async def text_to_speech(text):
-    audio_generator = elevenlabs.text_to_speech.convert(
+    audio = generate(
         text=text,
-        voice_id="JBFqnCBsd6RMkjVDRZzb",
-        model_id="eleven_multilingual_v2",
-        output_format="mp3_44100_128",
+        voice="Josh",
+        model="eleven_multilingual_v2"
     )
-    # Convert generator to bytes
-    audio_bytes = b''.join(chunk for chunk in audio_generator)
-    print(f"Audio bytes length: {len(audio_bytes)}")
-    return audio_bytes
+    return audio
     
 async def process_with_llm(text):
     print(f"Processing with LLM: {text}")
