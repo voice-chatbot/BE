@@ -1,7 +1,8 @@
 flask==3.0.0
 flask-cors==4.0.0
 python-dotenv==1.0.0
-livekit-server-sdk
+livekit
+livekit-agents
 elevenlabs==0.2.24
 pydub==0.25.1
 google-generativeai==0.3.1
