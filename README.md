@@ -50,30 +50,6 @@ pip install -r requirements.txt
 python server.py
 ```
 
-## Deployment
-
-### Render
-1. Create a new Web Service
-2. Connect your repository
-3. Set environment variables
-4. Deploy
-
-### Railway
-1. Create a new project
-2. Connect your repository
-3. Set environment variables
-4. Deploy
-
-### Heroku
-1. Create a new app
-2. Connect your repository
-3. Set environment variables
-4. Deploy
-
 ## API Endpoints
 
 - `GET /getToken`: Get LiveKit token for client connection
-
-## WebSocket
-
-The server uses LiveKit for real-time audio communication. Make sure your deployment platform supports WebSocket connections. 

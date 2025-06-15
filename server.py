@@ -22,9 +22,11 @@ app = Flask(__name__)
 # Configure CORS with specific origin
 CORS(app, resources={
     r"/*": {
-        "origins": os.getenv('FRONTEND_URL', '*'),
+        "origins": ["http://localhost:3000"],
         "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"]
+        "allow_headers": ["Content-Type", "Authorization"],
+        "supports_credentials": True,
+        "expose_headers": ["Content-Type", "Authorization"]
     }
 })
 
