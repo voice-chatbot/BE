@@ -40,3 +40,6 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db 
+
+# Audio output files
+output_*.mp3
